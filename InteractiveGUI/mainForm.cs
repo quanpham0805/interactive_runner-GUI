@@ -19,6 +19,7 @@ namespace InteractiveGUI
             InitializeComponent();
         }
 
+        // instruction
         private void Form1_Load(object sender, EventArgs e)
         {
             lblInstruction.Text = "1. Select testing_tool.py file (download from GCJ interactive problem).";
@@ -32,6 +33,7 @@ namespace InteractiveGUI
             lblInstruction.Text += "5. If everything went well, you'll see the verdict 😉";
         }
 
+        // select folder path
         private void btnTestingDirSelector_Click(object sender, EventArgs e)
         {
             OpenFileDialog fbd = new OpenFileDialog();
@@ -46,6 +48,7 @@ namespace InteractiveGUI
             txtSolutionFileDir.Text = fbd.FileName;
         }
 
+        // change state so that it is unchangeable during process
         private void changeState()
         {
             txtSolutionFileDir.ReadOnly = !txtSolutionFileDir.ReadOnly;
@@ -55,6 +58,7 @@ namespace InteractiveGUI
             btnJudge.Enabled = !btnJudge.Enabled;
         }
 
+        // set value for process
         private void setValue(ref ProcessStartInfo processInfo, string fileName, string args)
         {
             processInfo.FileName = fileName;
@@ -65,8 +69,10 @@ namespace InteractiveGUI
             processInfo.RedirectStandardError = true; // Any error in standard output will be redirected back (for example exceptions)
         }
 
+        // main 
         private void btnJudge_Click(object sender, EventArgs e)
         {
+            // validate some data
             if (string.IsNullOrEmpty(txtTestingToolDir.Text) || string.IsNullOrWhiteSpace(txtTestingToolDir.Text))
             {
                 if (MessageBox.Show("Empty directory is not allowed!", "Warning", MessageBoxButtons.OK) == DialogResult.OK)
@@ -95,11 +101,12 @@ namespace InteractiveGUI
                     return;
                 }
             }
+            // get test number
             int testSet;
             if (rbtn1.Checked) testSet = 0;
             else testSet = 1;
                
-            
+            // delete old exe file
             string TestingToolDirectory = txtTestingToolDir.Text;
             string SolutionDirectory = txtSolutionFileDir.Text;
             changeState();
@@ -112,6 +119,7 @@ namespace InteractiveGUI
             txtVerdict.Text = gcc;
             string compileCPP = string.Format("-std=c++14 -O2 {0} -o {1}", SolutionDirectory, Path.GetDirectoryName(SolutionDirectory) + "\\" + Path.GetFileNameWithoutExtension(SolutionDirectory));
             setValue(ref startCompilingCPP, gcc, compileCPP);
+
             Process process = new Process();
             process.StartInfo = startCompilingCPP;
             process.Start();
@@ -130,16 +138,24 @@ namespace InteractiveGUI
             string compilePython = string.Format("{0} {1} {2} {3} -- {4}", interactive_runner, python, TestingToolDirectory, testSet, Path.GetDirectoryName(SolutionDirectory) + "\\" + Path.GetFileNameWithoutExtension(SolutionDirectory));
             ProcessStartInfo startCompilingPython = new ProcessStartInfo();
             setValue(ref startCompilingPython, python, compilePython);
-            //txtVerdict.Text = compilePython;
 
             using (Process pyProcess = Process.Start(startCompilingPython))
             {
-                using (StreamReader reader = pyProcess.StandardOutput)
+                while (!pyProcess.HasExited)
                 {
-                    string stderr = pyProcess.StandardError.ReadToEnd(); // Here are the exceptions from our Python script
-                    string result = reader.ReadToEnd(); // Here is the result of StdOut(for example: print "test")
-                    txtVerdict.Text += stderr + Environment.NewLine + result;
+                    Application.DoEvents();
+                    TimeSpan runtime = DateTime.Now - pyProcess.StartTime;
+                    
+                    // allow the process to run for 30s
+                    if (runtime.TotalSeconds >= 30)
+                    {
+                        txtVerdict.Text = "Runtime Error";
+                        return;
+                    }
                 }
+                string stderr = pyProcess.StandardError.ReadToEnd(); // Here are the exceptions from our Python script
+                string result = pyProcess.StandardOutput.ReadToEnd(); // Here is the result of StdOut(for example: print "test")
+                txtVerdict.Text += stderr + Environment.NewLine + result;
             }
             /////////////////////////////////////////////////////////////////////////////////
             changeState();
