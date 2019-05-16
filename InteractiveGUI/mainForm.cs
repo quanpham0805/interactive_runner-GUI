@@ -31,6 +31,36 @@ namespace InteractiveGUI
             lblInstruction.Text += "4. Click \"Judge\" button and wait for a while.";
             lblInstruction.Text += Environment.NewLine;
             lblInstruction.Text += "5. If everything went well, you'll see the verdict 😉";
+
+            // make PATH
+            string envName = "PATH";
+            string pathVar = Environment.GetEnvironmentVariable(envName);
+            string cCompilerFolder = "MinGW\\bin";
+            if (pathVar.IndexOf(cCompilerFolder) == -1)
+            {
+                var value = "your path goes here";
+                if (pathVar[pathVar.Length - 1] != ';')
+                {
+                    value = pathVar + ";" + Path.Combine(Directory.GetCurrentDirectory(), @"MinGW\bin");
+                }
+                else
+                {
+                    value = pathVar + Path.Combine(Directory.GetCurrentDirectory(), @"MinGW\bin");
+                }
+                var target = EnvironmentVariableTarget.Machine;
+                try
+                {
+                    Environment.SetEnvironmentVariable(envName, value, target);
+                }
+                catch
+                {
+                    if (MessageBox.Show("Please run application as Administrator", "Warning", MessageBoxButtons.OK) == DialogResult.OK)
+                    {
+                        Application.Exit();
+                    }
+                }
+                
+            }
         }
 
         // select folder path
@@ -109,13 +139,14 @@ namespace InteractiveGUI
             // delete old exe file
             string TestingToolDirectory = txtTestingToolDir.Text;
             string SolutionDirectory = txtSolutionFileDir.Text;
+            string verdictMessage;
             changeState();
             File.Delete(Path.GetDirectoryName(SolutionDirectory) + "\\" + Path.GetFileNameWithoutExtension(SolutionDirectory) + ".exe");
               
             ////////////////////////////////////compile C++///////////////////////////////////
             // g++ -std=c++14 -O2 zzz.cpp -o zzz
             ProcessStartInfo startCompilingCPP = new ProcessStartInfo();
-            string gcc = Path.Combine(Directory.GetCurrentDirectory(), @"MinGW\\bin", "g++.exe");
+            string gcc = Path.Combine(Directory.GetCurrentDirectory(), @"MinGW\bin", "g++.exe");
             txtVerdict.Text = gcc;
             string compileCPP = string.Format("-std=c++14 -O2 {0} -o {1}", SolutionDirectory, Path.GetDirectoryName(SolutionDirectory) + "\\" + Path.GetFileNameWithoutExtension(SolutionDirectory));
             setValue(ref startCompilingCPP, gcc, compileCPP);
@@ -128,7 +159,8 @@ namespace InteractiveGUI
                 Application.DoEvents();
                 txtVerdict.Text = "Compiling your solution........";
             }
-            txtVerdict.Text = process.StandardError.ReadToEnd() + Environment.NewLine;
+            txtVerdict.Text = "Your solution might compile succesfully. Judging now........";
+            verdictMessage = process.StandardError.ReadToEnd() + Environment.NewLine;
             //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -150,14 +182,20 @@ namespace InteractiveGUI
                     if (runtime.TotalSeconds >= 30)
                     {
                         txtVerdict.Text = "Runtime Error";
+                        changeState();
                         return;
                     }
                 }
                 string stderr = pyProcess.StandardError.ReadToEnd(); // Here are the exceptions from our Python script
                 string result = pyProcess.StandardOutput.ReadToEnd(); // Here is the result of StdOut(for example: print "test")
-                txtVerdict.Text += stderr + Environment.NewLine + result;
+                verdictMessage += stderr + Environment.NewLine + result;
             }
             /////////////////////////////////////////////////////////////////////////////////
+            if (verdictMessage.IndexOf("Judge return code: 0") != -1)
+            {
+                verdictMessage += Environment.NewLine + "Pretest passed";
+            }
+            txtVerdict.Text = verdictMessage;
             changeState();
         }
     }
